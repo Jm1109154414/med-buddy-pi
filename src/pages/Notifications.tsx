@@ -3,10 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Bell, BellOff } from "lucide-react";
+import { ArrowLeft, Bell, BellOff, AlertCircle } from "lucide-react";
 import { registerPush, unregisterPush, isPushEnabled } from "@/lib/push-notifications";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BPxPzQ8kZxRQ0yGKQvZxF8P9mJLHgN2wYvR5K3nB1uT4oC6sV7dE9jW2xA3yL8mN5pK4qR6sT7uV8wX9yZ0aB1c';
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC;
 
 export default function Notifications() {
   const navigate = useNavigate();
@@ -26,6 +27,15 @@ export default function Notifications() {
   };
 
   const handleEnable = async () => {
+    if (!VAPID_PUBLIC_KEY) {
+      toast({
+        title: "Error",
+        description: "Falta configurar VITE_VAPID_PUBLIC en variables de entorno",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setProcessing(true);
     try {
       const sub = await registerPush(VAPID_PUBLIC_KEY);
@@ -87,6 +97,17 @@ export default function Notifications() {
         </div>
       </div>
 
+      {!VAPID_PUBLIC_KEY && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Configuración incompleta:</strong> Falta la variable VITE_VAPID_PUBLIC. 
+            Genera las claves con <code className="bg-background px-1 rounded">npx web-push generate-vapid-keys</code> y 
+            configura VITE_VAPID_PUBLIC en el cliente.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Notificaciones Push</CardTitle>
@@ -115,7 +136,7 @@ export default function Notifications() {
             </div>
             <Button
               onClick={enabled ? handleDisable : handleEnable}
-              disabled={checking || processing}
+              disabled={checking || processing || !VAPID_PUBLIC_KEY}
               variant={enabled ? "outline" : "default"}
             >
               {enabled ? "Desactivar" : "Activar"}

@@ -23,8 +23,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'PillMate - Recordatorio';
   const options = {
     body: data.body || 'Hora de tu medicamento',
-    icon: data.icon || '/icons/icon-192.png',
-    badge: data.badge || '/icons/badge-72.png',
+    icon: data.icon || '/icon-192.png',
+    badge: data.badge || '/badge.png',
     data: data.data || {},
     actions: [
       { action: 'open', title: 'Abrir' },

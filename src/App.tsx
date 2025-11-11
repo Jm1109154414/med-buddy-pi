@@ -12,6 +12,7 @@ import Schedules from "./pages/Schedules";
 import Reports from "./pages/Reports";
 import Notifications from "./pages/Notifications";
 import NotificationSnooze from "./pages/NotificationSnooze";
+import DevQuickstart from "./pages/DevQuickstart";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
           <Route path="/reports" element={<Reports />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/notifications/snooze" element={<NotificationSnooze />} />
+          <Route path="/dev/quickstart" element={<DevQuickstart />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
