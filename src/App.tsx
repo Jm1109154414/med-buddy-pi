@@ -11,6 +11,7 @@ import Compartments from "./pages/Compartments";
 import Schedules from "./pages/Schedules";
 import Reports from "./pages/Reports";
 import Notifications from "./pages/Notifications";
+import NotificationSnooze from "./pages/NotificationSnooze";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/schedules" element={<Schedules />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/notifications" element={<Notifications />} />
+          <Route path="/notifications/snooze" element={<NotificationSnooze />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

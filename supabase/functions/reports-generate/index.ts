@@ -187,6 +187,16 @@ serve(async (req) => {
 
     if (uploadError) {
       console.error('Upload error:', uploadError);
+      // Check if bucket doesn't exist
+      if (uploadError.message?.includes('not found') || uploadError.message?.includes('does not exist')) {
+        return new Response(JSON.stringify({ 
+          error: 'reports_bucket_missing',
+          message: 'El bucket de reportes no está configurado. Ejecuta: INSERT INTO storage.buckets (id, name, public) VALUES (\'reports\', \'reports\', false);'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       return new Response(JSON.stringify({ error: uploadError.message }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

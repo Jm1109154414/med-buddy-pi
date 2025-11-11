@@ -4,11 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Bell, BellOff } from "lucide-react";
-import {
-  registerPushNotifications,
-  unregisterPushNotifications,
-  isPushNotificationEnabled,
-} from "@/lib/push-notifications";
+import { registerPush, unregisterPush, isPushEnabled } from "@/lib/push-notifications";
+
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BPxPzQ8kZxRQ0yGKQvZxF8P9mJLHgN2wYvR5K3nB1uT4oC6sV7dE9jW2xA3yL8mN5pK4qR6sT7uV8wX9yZ0aB1c';
 
 export default function Notifications() {
   const navigate = useNavigate();
@@ -22,7 +20,7 @@ export default function Notifications() {
   }, []);
 
   const checkStatus = async () => {
-    const status = await isPushNotificationEnabled();
+    const status = await isPushEnabled();
     setEnabled(status);
     setChecking(false);
   };
@@ -30,8 +28,8 @@ export default function Notifications() {
   const handleEnable = async () => {
     setProcessing(true);
     try {
-      const success = await registerPushNotifications();
-      if (success) {
+      const sub = await registerPush(VAPID_PUBLIC_KEY);
+      if (sub) {
         setEnabled(true);
         toast({
           title: "Notificaciones activadas",
@@ -44,6 +42,12 @@ export default function Notifications() {
           variant: "destructive",
         });
       }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Error activando notificaciones",
+        variant: "destructive",
+      });
     } finally {
       setProcessing(false);
     }
@@ -52,7 +56,7 @@ export default function Notifications() {
   const handleDisable = async () => {
     setProcessing(true);
     try {
-      const success = await unregisterPushNotifications();
+      const success = await unregisterPush();
       if (success) {
         setEnabled(false);
         toast({
@@ -60,6 +64,12 @@ export default function Notifications() {
           description: "Ya no recibirás recordatorios push",
         });
       }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Error desactivando notificaciones",
+        variant: "destructive",
+      });
     } finally {
       setProcessing(false);
     }
