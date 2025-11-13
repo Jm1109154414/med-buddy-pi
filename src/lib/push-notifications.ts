@@ -19,9 +19,8 @@ export async function registerPush(): Promise<PushSub> {
 
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
 
-  // Ensure the Service Worker is registered and active before subscribing
-  await navigator.serviceWorker.register('/sw.js');
-  const readyReg = await navigator.serviceWorker.ready;
+  // Register the Service Worker (use the returned registration directly)
+  const reg = await navigator.serviceWorker.register('/sw.js');
 
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') return null;
@@ -29,21 +28,20 @@ export async function registerPush(): Promise<PushSub> {
   const appServerKey = urlBase64ToUint8Array(publicKey);
 
   // Try to reuse existing subscription, otherwise (re)subscribe
-  let sub = await readyReg.pushManager.getSubscription();
+  let sub = await reg.pushManager.getSubscription();
   if (!sub) {
     try {
-      sub = await readyReg.pushManager.subscribe({
+      sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        // Pass the Uint8Array directly (more compatible than ArrayBuffer)
         applicationServerKey: appServerKey.buffer as ArrayBuffer,
       });
     } catch (err) {
       // If there's a conflicting old subscription (e.g., VAPID key changed), unsubscribe and retry once
-      const existing = await readyReg.pushManager.getSubscription();
+      const existing = await reg.pushManager.getSubscription();
       if (existing) {
         try { await existing.unsubscribe(); } catch (_) {}
       }
-      sub = await readyReg.pushManager.subscribe({
+      sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: appServerKey.buffer as ArrayBuffer,
       });
