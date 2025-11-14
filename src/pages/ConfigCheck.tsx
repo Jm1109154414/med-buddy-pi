@@ -131,10 +131,14 @@ export default function ConfigCheck() {
     setProcessing(true);
     try {
       if ('serviceWorker' in navigator) {
-        const reg = await navigator.serviceWorker.ready;
+        // No esperes a serviceWorker.ready: usa getRegistration o registra si no existe
+        let reg = await navigator.serviceWorker.getRegistration('/sw.js');
+        if (!reg) {
+          reg = await navigator.serviceWorker.register('/sw.js');
+        }
         const existingSub = await reg.pushManager.getSubscription();
         if (existingSub) {
-          await existingSub.unsubscribe();
+          try { await existingSub.unsubscribe(); } catch (_) {}
         }
       }
       
@@ -145,6 +149,12 @@ export default function ConfigCheck() {
           description: "Re-suscripción completada",
         });
         await loadData();
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudo completar la re-suscripción",
+          variant: "destructive",
+        });
       }
     } catch (e: any) {
       toast({
