@@ -39,7 +39,7 @@ export default function Device() {
     try {
       const { data, error } = await supabase
         .from("devices")
-        .select("*")
+        .select("id, name, serial, timezone, created_at")
         .order("created_at", { ascending: false });
 
       if (error) throw error;

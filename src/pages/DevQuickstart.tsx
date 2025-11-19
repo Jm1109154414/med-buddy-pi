@@ -34,7 +34,7 @@ export default function DevQuickstart() {
       setHealth(healthData);
 
       // Load devices
-      const { data: devData } = await supabase.from('devices').select('*').order('created_at');
+      const { data: devData } = await supabase.from('devices').select('id, name, serial, timezone, created_at, user_id').order('created_at');
       setDevices(devData || []);
 
       // Load compartments if devices exist
