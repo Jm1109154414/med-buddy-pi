@@ -29,6 +29,40 @@ serve(async (req) => {
       console.error('Error checking buckets:', e);
     }
 
+    // Check authentication
+    const authHeader = req.headers.get('Authorization');
+    let isAuthenticated = false;
+    let userId: string | null = null;
+
+    if (authHeader) {
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser(
+          authHeader.replace('Bearer ', '')
+        );
+        
+        if (!authError && user) {
+          isAuthenticated = true;
+          userId = user.id;
+        }
+      } catch (e) {
+        console.error('Error checking auth:', e);
+      }
+    }
+
+    // Return minimal info for unauthenticated requests
+    if (!isAuthenticated) {
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          timestamp: new Date().toISOString(),
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Return detailed info for authenticated requests
     const result: any = {
       ok: true,
       hasVapidPublic,
@@ -37,33 +71,22 @@ serve(async (req) => {
       timestamp: new Date().toISOString(),
     };
 
-    // If Authorization header is present, get user-specific counts
-    const authHeader = req.headers.get('Authorization');
-    if (authHeader) {
-      try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser(
-          authHeader.replace('Bearer ', '')
-        );
-        
-        if (!authError && user) {
-          // Count push subscriptions
-          const { count: pushCount } = await supabase
-            .from('push_subscriptions')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', user.id);
-          
-          // Count devices
-          const { count: devicesCount } = await supabase
-            .from('devices')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', user.id);
-          
-          result.pushSubsCount = pushCount ?? 0;
-          result.devicesCount = devicesCount ?? 0;
-        }
-      } catch (e) {
-        console.error('Error getting user counts:', e);
-      }
+    // Get user-specific counts
+    try {
+      const { count: pushCount } = await supabase
+        .from('push_subscriptions')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      
+      const { count: devicesCount } = await supabase
+        .from('devices')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      
+      result.pushSubsCount = pushCount ?? 0;
+      result.devicesCount = devicesCount ?? 0;
+    } catch (e) {
+      console.error('Error getting user counts:', e);
     }
 
     return new Response(
@@ -77,10 +100,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         ok: false, 
-        error: error.message,
-        hasVapidPublic: false,
-        hasVapidPrivate: false,
-        hasReportsBucket: false,
+        timestamp: new Date().toISOString(),
       }),
       {
         status: 500,
