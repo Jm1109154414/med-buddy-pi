@@ -47,11 +47,13 @@ export default function Reports() {
   const fetchData = async () => {
     try {
       // Fetch recent events
+      const queryParams = new URLSearchParams({
+        deviceId: deviceId!,
+        pageSize: '20'
+      });
       const { data: eventsData, error: eventsError } = await supabase.functions.invoke(
-        "doses-query",
-        {
-          body: { deviceId, pageSize: 20 },
-        }
+        `doses-query?${queryParams.toString()}`,
+        { method: 'GET' }
       );
 
       if (eventsError) throw eventsError;
