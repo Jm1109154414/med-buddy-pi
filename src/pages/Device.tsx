@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Settings } from "lucide-react";
+import { Loader2, Plus, Settings, ArrowLeft } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface Device {
@@ -99,9 +99,14 @@ export default function Device() {
   return (
     <div className="container max-w-4xl mx-auto py-8 px-4">
       <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Dispositivos</h1>
-          <p className="text-muted-foreground">Gestiona tus pastilleros</p>
+        <div className="flex items-center">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="mr-4">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">Dispositivos</h1>
+            <p className="text-muted-foreground">Gestiona tus pastilleros</p>
+          </div>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>

@@ -165,7 +165,7 @@ export default function Schedules() {
   return (
     <div className="container max-w-6xl mx-auto py-8 px-4">
       <div className="flex items-center mb-8">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/device")} className="mr-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="mr-4">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>

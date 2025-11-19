@@ -87,7 +87,14 @@ export default function Reports() {
         body: { deviceId, type: reportType },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Report generation error:', error);
+        throw new Error(error.message || 'Error al generar el reporte');
+      }
+
+      if (!data) {
+        throw new Error('No se recibió respuesta del servidor');
+      }
 
       toast({
         title: "Reporte generado",
@@ -101,9 +108,10 @@ export default function Reports() {
 
       fetchData();
     } catch (error: any) {
+      console.error('Full error:', error);
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Error al generar reporte",
+        description: error.message || "Error desconocido al generar el reporte",
         variant: "destructive",
       });
     } finally {
@@ -158,7 +166,7 @@ export default function Reports() {
   return (
     <div className="container max-w-6xl mx-auto py-8 px-4">
       <div className="flex items-center mb-8">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/device")} className="mr-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="mr-4">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
