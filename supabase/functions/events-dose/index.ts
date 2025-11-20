@@ -1,10 +1,36 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-device-serial, x-device-secret',
 };
+
+// Validation schema
+const doseEventSchema = z.object({
+  serial: z.string().min(1).max(50),
+  secret: z.string().min(1).max(100),
+  compartmentId: z.string().uuid(),
+  scheduledAt: z.string().datetime(),
+  status: z.enum(['taken', 'late', 'missed', 'skipped']),
+  actualAt: z.string().datetime().optional(),
+  deltaWeightG: z.number().min(-1000).max(1000).optional(),
+  source: z.enum(['auto', 'manual']).default('auto'),
+  notes: z.string().max(500).optional(),
+  scheduleId: z.string().uuid().optional()
+});
+
+// SHA-256 verification for backward compatibility
+async function verifySHA256(secret: string, hashedSecret: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const secretData = encoder.encode(secret);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', secretData);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex === hashedSecret;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -22,6 +48,21 @@ serve(async (req) => {
       },
     });
 
+    const body = await req.json();
+    
+    // Validate input
+    const validation = doseEventSchema.safeParse(body);
+
+    if (!validation.success) {
+      return new Response(JSON.stringify({ 
+        error: 'Invalid input', 
+        details: validation.error.issues 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { 
       serial, 
       secret, 
@@ -30,17 +71,10 @@ serve(async (req) => {
       status, 
       actualAt, 
       deltaWeightG,
-      source = 'auto',
+      source,
       notes,
       scheduleId
-    } = await req.json();
-
-    if (!serial || !secret || !compartmentId || !scheduledAt || !status) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    } = validation.data;
 
     // Verify device
     const { data: device, error: deviceError } = await supabase
@@ -56,14 +90,15 @@ serve(async (req) => {
       });
     }
 
-    // Verify secret
-    const encoder = new TextEncoder();
-    const secretData = encoder.encode(secret);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', secretData);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    // Verify secret (bcrypt or SHA-256 fallback for old devices)
+    let isValid = false;
+    if (device.secret.startsWith('$2')) {
+      isValid = await bcrypt.compare(secret, device.secret);
+    } else {
+      isValid = await verifySHA256(secret, device.secret);
+    }
 
-    if (hashHex !== device.secret) {
+    if (!isValid) {
       return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

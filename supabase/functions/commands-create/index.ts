@@ -1,10 +1,18 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Validation schema
+const commandCreateSchema = z.object({
+  deviceId: z.string().uuid(),
+  type: z.enum(['snooze', 'apply_config', 'reboot']),
+  payload: z.any().optional()
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -33,14 +41,22 @@ serve(async (req) => {
       });
     }
 
-    const { deviceId, type, payload } = await req.json();
+    const body = await req.json();
+    
+    // Validate input
+    const validation = commandCreateSchema.safeParse(body);
 
-    if (!deviceId || !type) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+    if (!validation.success) {
+      return new Response(JSON.stringify({ 
+        error: 'Invalid input', 
+        details: validation.error.issues 
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    const { deviceId, type, payload } = validation.data;
 
     // Verify device ownership
     const { data: device, error: deviceError } = await supabase

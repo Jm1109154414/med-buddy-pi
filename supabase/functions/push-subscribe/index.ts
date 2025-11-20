@@ -1,10 +1,23 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Validation schema
+const subscriptionSchema = z.object({
+  subscription: z.object({
+    endpoint: z.string().url().max(1000),
+    keys: z.object({
+      p256dh: z.string().min(1).max(500),
+      auth: z.string().min(1).max(500)
+    })
+  }),
+  deviceInfo: z.any().optional()
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -33,14 +46,22 @@ serve(async (req) => {
       });
     }
 
-    const { subscription, deviceInfo } = await req.json();
+    const body = await req.json();
+    
+    // Validate input
+    const validation = subscriptionSchema.safeParse(body);
 
-    if (!subscription || !subscription.endpoint || !subscription.keys) {
-      return new Response(JSON.stringify({ error: 'Invalid subscription' }), {
+    if (!validation.success) {
+      return new Response(JSON.stringify({ 
+        error: 'Invalid subscription', 
+        details: validation.error.issues 
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    const { subscription, deviceInfo } = validation.data;
 
     // Upsert subscription
     const { data, error } = await supabase

@@ -1,10 +1,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-device-serial, x-device-secret',
 };
+
+// SHA-256 verification for backward compatibility
+async function verifySHA256(secret: string, hashedSecret: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const secretData = encoder.encode(secret);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', secretData);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex === hashedSecret;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -32,6 +44,14 @@ serve(async (req) => {
 
     // Mode 1: User authenticated (JWT)
     if (authHeader && deviceId) {
+      // Validate deviceId format
+      if (!z.string().uuid().safeParse(deviceId).success) {
+        return new Response(JSON.stringify({ error: 'Invalid deviceId format' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const jwt = authHeader.replace('Bearer ', '');
       const { data: { user }, error: authError } = await supabase.auth.getUser(jwt);
       
@@ -59,6 +79,14 @@ serve(async (req) => {
     }
     // Mode 2: Device authenticated (serial + secret)
     else if (serial && secret) {
+      // Validate serial and secret length
+      if (serial.length > 50 || secret.length > 100) {
+        return new Response(JSON.stringify({ error: 'Credentials too long' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const { data, error } = await supabase
         .from('devices')
         .select('*')
@@ -72,14 +100,15 @@ serve(async (req) => {
         });
       }
 
-      // Verify secret hash
-      const encoder = new TextEncoder();
-      const secretData = encoder.encode(secret);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', secretData);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      // Verify secret (bcrypt or SHA-256 fallback for old devices)
+      let isValid = false;
+      if (data.secret.startsWith('$2')) {
+        isValid = await bcrypt.compare(secret, data.secret);
+      } else {
+        isValid = await verifySHA256(secret, data.secret);
+      }
 
-      if (hashHex !== data.secret) {
+      if (!isValid) {
         return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -112,20 +141,22 @@ serve(async (req) => {
     const compartmentIds = compartments.map(c => c.id);
     const { data: schedules, error: schedError } = await supabase
       .from('schedules')
-      .select('id, compartment_id, time_of_day, days_of_week, window_minutes, enable_led, enable_buzzer')
+      .select('*')
       .in('compartment_id', compartmentIds);
 
     if (schedError) {
       console.error('Schedules error:', schedError);
+      return new Response(JSON.stringify({ error: 'Failed to fetch schedules' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
-
-    console.log(`Config fetched for device: ${device.id}`);
 
     return new Response(JSON.stringify({
       timezone: device.timezone,
       deviceId: device.id,
-      compartments: compartments,
-      schedules: schedules || [],
+      compartments,
+      schedules,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

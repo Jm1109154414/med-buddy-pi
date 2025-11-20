@@ -1,10 +1,27 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Validation schema
+const registerSchema = z.object({
+  serial: z.string().min(1).max(50).regex(/^[a-zA-Z0-9_-]+$/),
+  secret: z.string().min(8).max(100),
+  name: z.string().min(1).max(100),
+  timezone: z.string().refine((tz) => {
+    try {
+      new Intl.DateTimeFormat('en', { timeZone: tz });
+      return true;
+    } catch {
+      return false;
+    }
+  }, { message: "Invalid timezone" })
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -35,21 +52,28 @@ serve(async (req) => {
       });
     }
 
-    const { serial, secret, name, timezone = 'America/Mexico_City' } = await req.json();
+    const body = await req.json();
+    
+    // Validate input
+    const validation = registerSchema.safeParse({
+      ...body,
+      timezone: body.timezone || 'America/Mexico_City'
+    });
 
-    if (!serial || !secret || !name) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+    if (!validation.success) {
+      return new Response(JSON.stringify({ 
+        error: 'Invalid input', 
+        details: validation.error.issues 
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Hash secret using Argon2 (simulated with SHA-256 for now, Argon2 would need Deno module)
-    const encoder = new TextEncoder();
-    const data = encoder.encode(secret);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    const { serial, secret, name, timezone } = validation.data;
+
+    // Hash secret using bcrypt (stronger than SHA-256)
+    const hashedSecret = await bcrypt.hash(secret);
 
     // Create device
     const { data: device, error: deviceError } = await supabase
@@ -57,7 +81,7 @@ serve(async (req) => {
       .insert({
         user_id: user.id,
         serial,
-        secret: hashHex,
+        secret: hashedSecret,
         name,
         timezone,
       })
