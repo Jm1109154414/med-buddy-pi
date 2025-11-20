@@ -15,7 +15,6 @@
 const String BASE_URL = SUPABASE_URL;
 const String CONFIG_ENDPOINT = BASE_URL + "/functions/v1/devices-config";
 const String DOSE_EVENT_ENDPOINT = BASE_URL + "/functions/v1/events-dose";
-const String WEIGHTS_ENDPOINT = BASE_URL + "/functions/v1/weights-bulk";
 const String ALARM_START_ENDPOINT = BASE_URL + "/functions/v1/alarm-start";
 const String COMMANDS_POLL_ENDPOINT = BASE_URL + "/functions/v1/commands-poll";
 const String COMMANDS_ACK_ENDPOINT = BASE_URL + "/functions/v1/commands-ack";
@@ -31,7 +30,6 @@ struct Compartment {
   String title;
   int idx;
   bool active;
-  float expectedWeightG;
 };
 
 struct Schedule {
@@ -99,9 +97,8 @@ void loop() {
     fetchDeviceConfig();
   }
   
-  // Aquí irían tus verificaciones de horarios, peso, etc.
+  // Aquí irían tus verificaciones de horarios, etc.
   // checkSchedules();
-  // checkWeightChange();
   
   delay(1000);
 }
@@ -162,7 +159,6 @@ void fetchDeviceConfig() {
         compartments[compartmentCount].title = comp["title"].as<String>();
         compartments[compartmentCount].idx = comp["idx"];
         compartments[compartmentCount].active = comp["active"];
-        compartments[compartmentCount].expectedWeightG = comp["expected_pill_weight_g"];
         compartmentCount++;
       }
       
@@ -198,8 +194,7 @@ void fetchDeviceConfig() {
   http.end();
 }
 
-void reportDoseEvent(String compartmentId, String scheduledAt, String status, 
-                     float deltaWeightG = 0, String scheduleId = "") {
+void reportDoseEvent(String compartmentId, String scheduledAt, String status, String scheduleId = "") {
   if (WiFi.status() != WL_CONNECTED) return;
   
   HTTPClient http;
@@ -216,10 +211,6 @@ void reportDoseEvent(String compartmentId, String scheduledAt, String status,
   doc["source"] = "auto";
   doc["actualAt"] = getCurrentTimestamp();
   
-  if (deltaWeightG != 0) {
-    doc["deltaWeightG"] = deltaWeightG;
-  }
-  
   if (scheduleId.length() > 0) {
     doc["scheduleId"] = scheduleId;
   }
@@ -233,38 +224,6 @@ void reportDoseEvent(String compartmentId, String scheduledAt, String status,
     Serial.println("✓ Evento de dosis reportado");
   } else {
     Serial.printf("✗ Error reportando evento: %d\n", httpCode);
-  }
-  
-  http.end();
-}
-
-void reportWeightReadings(float weights[], int count) {
-  if (WiFi.status() != WL_CONNECTED || count == 0) return;
-  
-  HTTPClient http;
-  http.begin(WEIGHTS_ENDPOINT);
-  http.addHeader("Content-Type", "application/json");
-  
-  DynamicJsonDocument doc(2048);
-  doc["serial"] = DEVICE_SERIAL;
-  doc["secret"] = DEVICE_SECRET;
-  
-  JsonArray readings = doc.createNestedArray("readings");
-  for (int i = 0; i < count; i++) {
-    JsonObject reading = readings.createNestedObject();
-    reading["measuredAt"] = getCurrentTimestamp();
-    reading["weightG"] = weights[i];
-  }
-  
-  String jsonPayload;
-  serializeJson(doc, jsonPayload);
-  
-  int httpCode = http.POST(jsonPayload);
-  
-  if (httpCode == 200) {
-    Serial.printf("✓ %d lecturas de peso enviadas\n", count);
-  } else {
-    Serial.printf("✗ Error enviando pesos: %d\n", httpCode);
   }
   
   http.end();

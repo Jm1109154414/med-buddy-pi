@@ -6,7 +6,6 @@ Este directorio contiene el código Arduino para conectar tu pastillero ESP32 al
 
 ### Hardware
 - ESP32 (cualquier variante)
-- Sensor de peso (HX711 + celda de carga)
 - Servo motor (para dispensar pastillas)
 - LED y Buzzer para alarmas
 - Alimentación 5V
@@ -72,52 +71,25 @@ http.addHeader("x-device-secret", DEVICE_SECRET);
 
 #### 2. Reportar evento de dosis (`events-dose`)
 - **Método**: POST
-- **Cuándo**: Cuando detectas que se tomó una pastilla
-- **Payload**: compartmentId, scheduledAt, status, deltaWeightG
+- **Cuándo**: Cuando el usuario confirma que tomó la pastilla
+- **Payload**: compartmentId, scheduledAt, status, scheduleId
 
-#### 3. Enviar lecturas de peso (`weights-bulk`)
-- **Método**: POST
-- **Cuándo**: Batch de lecturas del sensor
-- **Payload**: Array de { measuredAt, weightG }
-
-#### 4. Iniciar alarma (`alarm-start`)
+#### 3. Iniciar alarma (`alarm-start`)
 - **Método**: POST
 - **Cuándo**: Cuando llega la hora de tomar medicina
 - **Efecto**: Envía notificación push al usuario
 
-#### 5. Consultar comandos (`commands-poll`)
+#### 4. Consultar comandos (`commands-poll`)
 - **Método**: GET
 - **Frecuencia**: Cada 30 segundos
 - **Retorna**: Comandos pendientes (snooze, apply_config, reboot)
 
-#### 6. Confirmar comando (`commands-ack`)
+#### 5. Confirmar comando (`commands-ack`)
 - **Método**: POST
 - **Cuándo**: Después de ejecutar un comando
 - **Payload**: commandId, status (done/error)
 
 ## 🔧 Personalización
-
-### Añadir sensor de peso
-```cpp
-#include <HX711.h>
-
-HX711 scale;
-
-void setup() {
-  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-  scale.set_scale(CALIBRATION_FACTOR);
-  scale.tare();
-}
-
-void loop() {
-  float weight = scale.get_units();
-  
-  if (weight < lastWeight - 5.0) {
-    // Pastilla tomada
-    reportDoseEvent(currentCompartmentId, currentScheduledAt, "taken", weight - lastWeight);
-  }
-}
-```
 
 ### Añadir servo para dispensar
 ```cpp
@@ -126,10 +98,17 @@ void loop() {
 Servo dispenser;
 
 void dispenseFromCompartment(int compartmentIdx) {
-  int angle = compartments[compartmentIdx].servoAngleDeg;
-  dispenser.write(angle);
+  // Usar el ángulo configurado en el compartimento
+  dispenser.write(90); // Ajusta según tu hardware
   delay(1000);
   dispenser.write(0);
+  
+  // Reportar que se dispensó
+  reportDoseEvent(
+    compartments[compartmentIdx].id,
+    getCurrentTimestamp(),
+    "taken"
+  );
 }
 ```
 
