@@ -14,10 +14,10 @@ const Index = () => {
             Pastillero inteligente. Nunca olvides tomar tus medicamentos.
           </p>
           <div className="flex gap-4 justify-center">
-            <Button size="lg" onClick={() => navigate("/auth")} className="shadow-lg">
+            <Button size="lg" onClick={() => navigate("/auth?mode=signup")} className="shadow-lg">
               Comenzar
             </Button>
-            <Button size="lg" variant="secondary" onClick={() => navigate("/auth")}>
+            <Button size="lg" variant="secondary" onClick={() => navigate("/auth?mode=login")}>
               Iniciar sesión
             </Button>
           </div>
