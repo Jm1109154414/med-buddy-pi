@@ -1,7 +1,36 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
+
+// Helper function to hash secret using Web Crypto API (PBKDF2)
+async function hashSecret(secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(secret);
+  const salt = encoder.encode('pillmate-salt-v1'); // Fixed salt for device secrets
+  
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    data,
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits']
+  );
+  
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    256
+  );
+  
+  // Convert to hex string
+  const hashArray = Array.from(new Uint8Array(derivedBits));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -72,8 +101,8 @@ serve(async (req) => {
 
     const { serial, secret, name, timezone } = validation.data;
 
-    // Hash secret using bcrypt (stronger than SHA-256)
-    const hashedSecret = await bcrypt.hash(secret);
+    // Hash secret using PBKDF2
+    const hashedSecret = await hashSecret(secret);
 
     // Create device
     const { data: device, error: deviceError } = await supabase
